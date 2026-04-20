@@ -44,7 +44,7 @@ public class JwtDecoderConfig {
         private static final OAuth2Error ERROR = new OAuth2Error(
                 "invalid_token",
                 "The required audience is missing",
-                "https://tools.ietf.org/html/rfc6750#section-3.1"
+                "placeholder"
         );
 
         private final String expectedAudience;
