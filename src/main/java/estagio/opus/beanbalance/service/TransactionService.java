@@ -3,11 +3,11 @@ package estagio.opus.beanbalance.service;
 import estagio.opus.beanbalance.domain.entity.Account;
 import estagio.opus.beanbalance.domain.entity.Category;
 import estagio.opus.beanbalance.domain.entity.Transaction;
-import estagio.opus.beanbalance.domain.entity.User;
 import estagio.opus.beanbalance.domain.enums.TransactionType;
 import estagio.opus.beanbalance.domain.repository.AccountRepository;
 import estagio.opus.beanbalance.domain.repository.CategoryRepository;
 import estagio.opus.beanbalance.domain.repository.TransactionRepository;
+import estagio.opus.beanbalance.domain.repository.UserRepository;
 import estagio.opus.beanbalance.exception.ResourceNotFoundException;
 import estagio.opus.beanbalance.web.dto.transaction.TransactionRequest;
 import estagio.opus.beanbalance.web.dto.transaction.TransactionResponse;
@@ -28,23 +28,24 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
     private final CategoryRepository categoryRepository;
+    private final UserRepository userRepository;
     private final TransactionMapper transactionMapper;
 
     @Transactional(readOnly = true)
-    public Page<TransactionResponse> findAllByUser(User user, Pageable pageable) {
-        return transactionRepository.findAllByUserId(user.getId(), pageable)
+    public Page<TransactionResponse> findAllByUser(UUID userId, Pageable pageable) {
+        return transactionRepository.findAllByUserId(userId, pageable)
                 .map(transactionMapper::toResponse);
     }
 
     @Transactional(readOnly = true)
-    public TransactionResponse findByIdAndUser(UUID transactionId, User user) {
-        Transaction transaction = getTransactionOrThrow(transactionId, user.getId());
+    public TransactionResponse findByIdAndUser(UUID transactionId, UUID userId) {
+        Transaction transaction = getTransactionOrThrow(transactionId, userId);
         return transactionMapper.toResponse(transaction);
     }
 
     @Transactional
-    public TransactionResponse create(TransactionRequest request, User user) {
-        Account account = accountRepository.findByIdAndUserId(request.accountId(), user.getId())
+    public TransactionResponse create(TransactionRequest request, UUID userId) {
+        Account account = accountRepository.findByIdAndUserId(request.accountId(), userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Account", request.accountId()));
 
         Category category = categoryRepository.findById(request.categoryId())
@@ -57,7 +58,7 @@ public class TransactionService {
                 .date(request.date())
                 .account(account)
                 .category(category)
-                .user(user)
+                .user(userRepository.getReferenceById(userId))
                 .build();
 
         updateAccountBalance(account, request.amount(), request.type());
@@ -66,8 +67,8 @@ public class TransactionService {
     }
 
     @Transactional
-    public void delete(UUID transactionId, User user) {
-        Transaction transaction = getTransactionOrThrow(transactionId, user.getId());
+    public void delete(UUID transactionId, UUID userId) {
+        Transaction transaction = getTransactionOrThrow(transactionId, userId);
         reverseAccountBalance(transaction);
         transactionRepository.delete(transaction);
     }

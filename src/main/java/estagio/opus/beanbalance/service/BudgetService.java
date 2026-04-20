@@ -2,11 +2,11 @@ package estagio.opus.beanbalance.service;
 
 import estagio.opus.beanbalance.domain.entity.Budget;
 import estagio.opus.beanbalance.domain.entity.Category;
-import estagio.opus.beanbalance.domain.entity.User;
 import estagio.opus.beanbalance.domain.enums.TransactionType;
 import estagio.opus.beanbalance.domain.repository.BudgetRepository;
 import estagio.opus.beanbalance.domain.repository.CategoryRepository;
 import estagio.opus.beanbalance.domain.repository.TransactionRepository;
+import estagio.opus.beanbalance.domain.repository.UserRepository;
 import estagio.opus.beanbalance.exception.DuplicateResourceException;
 import estagio.opus.beanbalance.exception.ResourceNotFoundException;
 import estagio.opus.beanbalance.web.dto.budget.BudgetRequest;
@@ -29,21 +29,22 @@ public class BudgetService {
     private final BudgetRepository budgetRepository;
     private final CategoryRepository categoryRepository;
     private final TransactionRepository transactionRepository;
+    private final UserRepository userRepository;
     private final BudgetMapper budgetMapper;
 
     @Transactional(readOnly = true)
-    public List<BudgetResponse> findAllByUserAndMonth(User user, String referenceMonth) {
-        return budgetRepository.findAllByUserIdAndReferenceMonth(user.getId(), referenceMonth).stream()
-                .map(budget -> enrichWithSpentAmount(budget, user.getId()))
+    public List<BudgetResponse> findAllByUserAndMonth(UUID userId, String referenceMonth) {
+        return budgetRepository.findAllByUserIdAndReferenceMonth(userId, referenceMonth).stream()
+                .map(budget -> enrichWithSpentAmount(budget, userId))
                 .toList();
     }
 
     @Transactional
-    public BudgetResponse create(BudgetRequest request, User user) {
+    public BudgetResponse create(BudgetRequest request, UUID userId) {
         String referenceMonth = request.referenceMonth();
 
         if (budgetRepository.existsByUserIdAndCategoryIdAndReferenceMonth(
-                user.getId(), request.categoryId(), referenceMonth)) {
+                userId, request.categoryId(), referenceMonth)) {
             throw new DuplicateResourceException("Budget already exists for this category and month");
         }
 
@@ -54,24 +55,24 @@ public class BudgetService {
                 .limitAmount(request.limitAmount())
                 .referenceMonth(referenceMonth)
                 .category(category)
-                .user(user)
+                .user(userRepository.getReferenceById(userId))
                 .build();
 
         Budget saved = budgetRepository.save(budget);
-        return enrichWithSpentAmount(saved, user.getId());
+        return enrichWithSpentAmount(saved, userId);
     }
 
     @Transactional
-    public BudgetResponse update(UUID budgetId, BudgetRequest request, User user) {
-        Budget budget = getBudgetOrThrow(budgetId, user.getId());
+    public BudgetResponse update(UUID budgetId, BudgetRequest request, UUID userId) {
+        Budget budget = getBudgetOrThrow(budgetId, userId);
         budget.setLimitAmount(request.limitAmount());
         Budget saved = budgetRepository.save(budget);
-        return enrichWithSpentAmount(saved, user.getId());
+        return enrichWithSpentAmount(saved, userId);
     }
 
     @Transactional
-    public void delete(UUID budgetId, User user) {
-        Budget budget = getBudgetOrThrow(budgetId, user.getId());
+    public void delete(UUID budgetId, UUID userId) {
+        Budget budget = getBudgetOrThrow(budgetId, userId);
         budgetRepository.delete(budget);
     }
 

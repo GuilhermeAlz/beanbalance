@@ -1,8 +1,8 @@
 package estagio.opus.beanbalance.service;
 
 import estagio.opus.beanbalance.domain.entity.Category;
-import estagio.opus.beanbalance.domain.entity.User;
 import estagio.opus.beanbalance.domain.repository.CategoryRepository;
+import estagio.opus.beanbalance.domain.repository.UserRepository;
 import estagio.opus.beanbalance.exception.ResourceNotFoundException;
 import estagio.opus.beanbalance.web.dto.category.CategoryRequest;
 import estagio.opus.beanbalance.web.dto.category.CategoryResponse;
@@ -19,33 +19,34 @@ import java.util.UUID;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final UserRepository userRepository;
     private final CategoryMapper categoryMapper;
 
     @Transactional(readOnly = true)
-    public List<CategoryResponse> findAllAccessibleByUser(User user) {
-        return categoryRepository.findAllAccessibleByUser(user.getId()).stream()
+    public List<CategoryResponse> findAllAccessibleByUser(UUID userId) {
+        return categoryRepository.findAllAccessibleByUser(userId).stream()
                 .map(categoryMapper::toResponse)
                 .toList();
     }
 
     @Transactional
-    public CategoryResponse create(CategoryRequest request, User user) {
+    public CategoryResponse create(CategoryRequest request, UUID userId) {
         Category category = categoryMapper.toEntity(request);
-        category.setUser(user);
+        category.setUser(userRepository.getReferenceById(userId));
         category.setCustom(true);
         return categoryMapper.toResponse(categoryRepository.save(category));
     }
 
     @Transactional
-    public CategoryResponse update(UUID categoryId, CategoryRequest request, User user) {
-        Category category = getOwnedCategoryOrThrow(categoryId, user.getId());
+    public CategoryResponse update(UUID categoryId, CategoryRequest request, UUID userId) {
+        Category category = getOwnedCategoryOrThrow(categoryId, userId);
         categoryMapper.updateEntity(request, category);
         return categoryMapper.toResponse(categoryRepository.save(category));
     }
 
     @Transactional
-    public void delete(UUID categoryId, User user) {
-        Category category = getOwnedCategoryOrThrow(categoryId, user.getId());
+    public void delete(UUID categoryId, UUID userId) {
+        Category category = getOwnedCategoryOrThrow(categoryId, userId);
         categoryRepository.delete(category);
     }
 
