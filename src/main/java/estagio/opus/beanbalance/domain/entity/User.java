@@ -39,6 +39,9 @@ public class User implements UserDetails {
     @Builder.Default
     private Role role = Role.USER;
 
+    @Column(name = "external_auth_id", unique = true)
+    private String externalAuthId;
+
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
