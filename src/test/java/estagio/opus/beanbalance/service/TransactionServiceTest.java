@@ -9,6 +9,7 @@ import estagio.opus.beanbalance.domain.enums.TransactionType;
 import estagio.opus.beanbalance.domain.repository.AccountRepository;
 import estagio.opus.beanbalance.domain.repository.CategoryRepository;
 import estagio.opus.beanbalance.domain.repository.TransactionRepository;
+import estagio.opus.beanbalance.domain.repository.UserRepository;
 import estagio.opus.beanbalance.exception.ResourceNotFoundException;
 import estagio.opus.beanbalance.web.dto.transaction.TransactionRequest;
 import estagio.opus.beanbalance.web.dto.transaction.TransactionResponse;
@@ -41,11 +42,13 @@ class TransactionServiceTest {
     @Mock private TransactionRepository transactionRepository;
     @Mock private AccountRepository accountRepository;
     @Mock private CategoryRepository categoryRepository;
+    @Mock private UserRepository userRepository;
     @Mock private TransactionMapper transactionMapper;
 
     @InjectMocks
     private TransactionService transactionService;
 
+    private UUID userId;
     private User user;
     private Account account;
     private Category category;
@@ -53,7 +56,8 @@ class TransactionServiceTest {
 
     @BeforeEach
     void setUp() {
-        user = User.builder().id(UUID.randomUUID()).build();
+        userId = UUID.randomUUID();
+        user = User.builder().id(userId).build();
         account = Account.builder()
                 .id(UUID.randomUUID())
                 .name("Main")
@@ -84,11 +88,11 @@ class TransactionServiceTest {
                 null, LocalDate.now(), account.getId(), "Main",
                 category.getId(), "Food", LocalDateTime.now());
 
-        when(transactionRepository.findAllByUserId(user.getId(), pageable))
+        when(transactionRepository.findAllByUserId(userId, pageable))
                 .thenReturn(new PageImpl<>(List.of(transaction)));
         when(transactionMapper.toResponse(transaction)).thenReturn(response);
 
-        Page<TransactionResponse> result = transactionService.findAllByUser(user, pageable);
+        Page<TransactionResponse> result = transactionService.findAllByUser(userId, pageable);
 
         assertThat(result.getTotalElements()).isEqualTo(1);
     }
@@ -103,14 +107,15 @@ class TransactionServiceTest {
                 "Lunch", LocalDate.now(), account.getId(), "Main",
                 category.getId(), "Food", LocalDateTime.now());
 
-        when(accountRepository.findByIdAndUserId(account.getId(), user.getId()))
+        when(accountRepository.findByIdAndUserId(account.getId(), userId))
                 .thenReturn(Optional.of(account));
         when(categoryRepository.findById(category.getId()))
                 .thenReturn(Optional.of(category));
+        when(userRepository.getReferenceById(userId)).thenReturn(user);
         when(transactionRepository.save(any(Transaction.class))).thenReturn(transaction);
         when(transactionMapper.toResponse(any(Transaction.class))).thenReturn(response);
 
-        TransactionResponse result = transactionService.create(request, user);
+        TransactionResponse result = transactionService.create(request, userId);
 
         assertThat(result).isNotNull();
         assertThat(account.getBalance()).isEqualByComparingTo(BigDecimal.valueOf(950));
@@ -125,16 +130,16 @@ class TransactionServiceTest {
 
         when(accountRepository.findByIdAndUserId(any(), any())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> transactionService.create(request, user))
+        assertThatThrownBy(() -> transactionService.create(request, userId))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void delete_shouldReverseBalanceAndRemoveTransaction() {
-        when(transactionRepository.findByIdAndUserId(transaction.getId(), user.getId()))
+        when(transactionRepository.findByIdAndUserId(transaction.getId(), userId))
                 .thenReturn(Optional.of(transaction));
 
-        transactionService.delete(transaction.getId(), user);
+        transactionService.delete(transaction.getId(), userId);
 
         assertThat(account.getBalance()).isEqualByComparingTo(BigDecimal.valueOf(1050));
         verify(transactionRepository).delete(transaction);

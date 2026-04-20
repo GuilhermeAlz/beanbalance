@@ -4,6 +4,7 @@ import estagio.opus.beanbalance.domain.entity.Account;
 import estagio.opus.beanbalance.domain.entity.User;
 import estagio.opus.beanbalance.domain.enums.AccountType;
 import estagio.opus.beanbalance.domain.repository.AccountRepository;
+import estagio.opus.beanbalance.domain.repository.UserRepository;
 import estagio.opus.beanbalance.exception.ResourceNotFoundException;
 import estagio.opus.beanbalance.web.dto.account.AccountRequest;
 import estagio.opus.beanbalance.web.dto.account.AccountResponse;
@@ -30,18 +31,21 @@ import static org.mockito.Mockito.*;
 class AccountServiceTest {
 
     @Mock private AccountRepository accountRepository;
+    @Mock private UserRepository userRepository;
     @Mock private AccountMapper accountMapper;
 
     @InjectMocks
     private AccountService accountService;
 
+    private UUID userId;
     private User user;
     private Account account;
     private AccountResponse accountResponse;
 
     @BeforeEach
     void setUp() {
-        user = User.builder().id(UUID.randomUUID()).build();
+        userId = UUID.randomUUID();
+        user = User.builder().id(userId).build();
         account = Account.builder()
                 .id(UUID.randomUUID())
                 .name("Main Account")
@@ -56,10 +60,10 @@ class AccountServiceTest {
 
     @Test
     void findAllByUser_shouldReturnUserAccounts() {
-        when(accountRepository.findAllByUserId(user.getId())).thenReturn(List.of(account));
+        when(accountRepository.findAllByUserId(userId)).thenReturn(List.of(account));
         when(accountMapper.toResponse(account)).thenReturn(accountResponse);
 
-        List<AccountResponse> result = accountService.findAllByUser(user);
+        List<AccountResponse> result = accountService.findAllByUser(userId);
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().name()).isEqualTo("Main Account");
@@ -69,10 +73,11 @@ class AccountServiceTest {
     void create_shouldSaveAndReturnAccount() {
         var request = new AccountRequest("Savings", AccountType.SAVINGS, BigDecimal.valueOf(500));
         when(accountMapper.toEntity(request)).thenReturn(account);
+        when(userRepository.getReferenceById(userId)).thenReturn(user);
         when(accountRepository.save(any(Account.class))).thenReturn(account);
         when(accountMapper.toResponse(account)).thenReturn(accountResponse);
 
-        AccountResponse result = accountService.create(request, user);
+        AccountResponse result = accountService.create(request, userId);
 
         assertThat(result).isNotNull();
         verify(accountRepository).save(any(Account.class));
@@ -81,18 +86,18 @@ class AccountServiceTest {
     @Test
     void findByIdAndUser_shouldThrowWhenNotFound() {
         UUID accountId = UUID.randomUUID();
-        when(accountRepository.findByIdAndUserId(accountId, user.getId())).thenReturn(Optional.empty());
+        when(accountRepository.findByIdAndUserId(accountId, userId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> accountService.findByIdAndUser(accountId, user))
+        assertThatThrownBy(() -> accountService.findByIdAndUser(accountId, userId))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void delete_shouldRemoveAccount() {
-        when(accountRepository.findByIdAndUserId(account.getId(), user.getId()))
+        when(accountRepository.findByIdAndUserId(account.getId(), userId))
                 .thenReturn(Optional.of(account));
 
-        accountService.delete(account.getId(), user);
+        accountService.delete(account.getId(), userId);
 
         verify(accountRepository).delete(account);
     }
