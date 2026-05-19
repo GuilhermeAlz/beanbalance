@@ -3,11 +3,13 @@ package estagio.opus.beanbalance.service;
 import estagio.opus.beanbalance.domain.entity.Category;
 import estagio.opus.beanbalance.domain.repository.CategoryRepository;
 import estagio.opus.beanbalance.domain.repository.UserRepository;
+import estagio.opus.beanbalance.exception.BusinessException;
 import estagio.opus.beanbalance.exception.ResourceNotFoundException;
 import estagio.opus.beanbalance.web.dto.category.CategoryRequest;
 import estagio.opus.beanbalance.web.dto.category.CategoryResponse;
 import estagio.opus.beanbalance.web.mapper.CategoryMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +50,11 @@ public class CategoryService {
     public void delete(UUID categoryId, UUID userId) {
         Category category = getOwnedCategoryOrThrow(categoryId, userId);
         categoryRepository.delete(category);
+        try {
+            categoryRepository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessException("Cannot delete category: it is referenced by existing transactions or budgets");
+        }
     }
 
     private Category getOwnedCategoryOrThrow(UUID categoryId, UUID userId) {
